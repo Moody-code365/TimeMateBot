@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Optional, List
 from models import ShiftRecord
 from config import config
@@ -42,10 +42,32 @@ class ShiftStorage:
                 for shift_data in data.get('shift_history', [])
             ]
 
+            self._clean_old_records()
+
             print(f"✅ Загружено: {len(self.active_shifts)} активных смен, "
                   f"{len(self.shift_history)} записей истории")
         except Exception as e:
             print(f"⚠️ Ошибка загрузки данных: {e}")
+
+    def _clean_old_records(self):
+        """Удалить записи истории, старые чем KEEP_HISTORY_DAYS дней"""
+        # Сохраняем исходное количество
+        original_count = len(self.shift_history)
+
+        # Вычисляем дату отсечки
+        cutoff_date = datetime.now() - timedelta(days=config.KEEP_HISTORY_DAYS)
+
+        # Оставляем только свежие записи (старше cutoff_date)
+        self.shift_history = [
+            shift for shift in self.shift_history
+            if shift.start_datetime > cutoff_date
+        ]
+
+        # Подсчитываем удалённые записи
+        deleted_count = original_count - len(self.shift_history)
+        if deleted_count > 0:
+            print(f"️ Удалено {deleted_count} старых записей (старше {config.KEEP_HISTORY_DAYS} дней)")
+            self._save_data()
 
     def _save_data(self):
         """Сохранить данные в файл"""
@@ -65,6 +87,59 @@ class ShiftStorage:
         except Exception as e:
             print(f"⚠️ Ошибка сохранения данных: {e}")
 
+    def get_user_schedule(self, user_id: int) -> tuple:
+        """Получить расписание пользователя"""
+        return config.USER_SCHEDULES.get(user_id, (9, 18))  # По умолчанию 9-18
+
+    def is_off_day(self) -> bool:
+        """Проверить: сегодня выходной?"""
+        weekday = datetime.now().weekday()  # 0=Пн, 6=Вс
+        return weekday in config.OFF_DAYS
+
+    def is_working_hours(self, user_id: int) -> bool:
+        """Проверить: сейчас рабочие часы пользователя?"""
+        from datetime import time
+
+        # Если сегодня выходной, рабочих часов нет
+        if self.is_off_day():
+            return False
+
+        current_time = datetime.now().time()
+        start_hour, end_hour = self.get_user_schedule(user_id)
+
+        # Если конец смены раньше чем начало (ночная смена, например 17-02)
+        if end_hour < start_hour:
+            # Ночная смена: работаем либо после start_hour, либо до end_hour
+            return current_time >= time(start_hour, 0) or current_time < time(end_hour, 0)
+        else:
+            # Дневная смена: работаем между start_hour и end_hour
+            return time(start_hour, 0) <= current_time < time(end_hour, 0)
+
+    def check_forgot_to_checkin(self, user_id: int) -> bool:
+        """Проверить: пользователь забыл отметиться приходом?
+
+        Возвращает True если:
+        - Сейчас рабочие часы пользователя
+        - Но он не отметился приходом
+        """
+        return self.is_working_hours(user_id) and not self.is_on_shift(user_id)
+
+    def check_forgot_to_checkout(self, user_id: int) -> bool:
+        """Проверить: пользователь забыл отметиться уходом?
+
+        Возвращает True если:
+        - Пользователь на смене (есть start_time)
+        - Но смена длится дольше MAX_SHIFT_HOURS часов
+        """
+        shift = self.get_active_shift(user_id)
+        if not shift:
+            return False
+
+        elapsed_time = datetime.now() - shift.start_datetime
+        max_hours = config.MAX_SHIFT_HOURS
+
+        return elapsed_time.total_seconds() / 3600 > max_hours
+
     def start_shift(self, user_id: int, username: str, full_name: str) -> ShiftRecord:
         """Начать смену"""
         shift = ShiftRecord(
@@ -83,6 +158,7 @@ class ShiftStorage:
         if shift:
             shift.end_time = datetime.now().isoformat()
             self.shift_history.append(shift)
+            self._clean_old_records()  # Очищаем при добавлении новой записи
             self._save_data()
         return shift
 
