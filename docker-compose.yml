@@ -1,6 +1,7 @@
 services:
   timemate-bot:
     build: .
+
     container_name: timemate-bot
     restart: unless-stopped
     environment:
