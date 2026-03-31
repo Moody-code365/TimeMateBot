@@ -46,10 +46,10 @@ async def cmd_admin_panel(message: Message):
         return
     
     await message.answer(
-        "👑 <b>Админ-панель активирована!</b>\n\n"
-        "Используйте кнопки внизу для управления:",
+        "👑 <b>Админ-панель</b>\n\n"
+        "Выберите действие:",
         parse_mode="HTML",
-        reply_markup=get_admin_reply_keyboard()
+        reply_markup=get_admin_keyboard()
     )
 
 
