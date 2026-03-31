@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 
@@ -20,6 +20,31 @@ async def cmd_start(message: Message):
     # Показываем ID группы в консоли
     if message.chat.type in ['group', 'supergroup']:
         print(f"📝 ID этой группы: {message.chat.id}")
+        
+        # Проверяем является ли пользователь владельцем
+        try:
+            admins = await message.bot.get_chat_administrators(message.chat.id)
+            is_owner = any(admin.status == "creator" and admin.user.id == message.from_user.id for admin in admins)
+            
+            if is_owner:
+                await message.answer(
+                    "👋 <b>Привет! Я бот учёта рабочего времени</b>\n\n"
+                    "👑 <b>Обнаружен владелец группы!</b>\n"
+                    "Доступна админ-панель: /admin\n\n"
+                    "Используй кнопки внизу для отметки смен:\n"
+                    "🟢 <b>Пришёл</b> — начать смену\n"
+                    "🔴 <b>Ушёл</b> — закончить смену\n"
+                    "📊 <b>Статус</b> — кто сейчас на работе\n"
+                    "📜 <b>История</b> — твои последние смены\n\n"
+                    "<b>Команды:</b>\n"
+                    "/stats — твоя статистика\n"
+                    "/admin — админ-панель (только для владельца)",
+                    parse_mode="HTML",
+                    reply_markup=get_reply_keyboard()
+                )
+                return
+        except Exception as e:
+            print(f"Ошибка проверки владельца: {e}")
 
     await message.answer(
         "👋 <b>Привет! Я бот учёта рабочего времени</b>\n\n"

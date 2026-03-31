@@ -3,8 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Config:
     """Конфигурация бота"""
+    
     # Токен бота (получить у @BotFather)
     BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 
@@ -17,14 +19,10 @@ class Config:
     # Лимит истории для показа
     HISTORY_LIMIT: int = 5
 
-    # Хранить только последние N дней (90 дней = 3 месяца)
-    KEEP_HISTORY_DAYS: int = 30
+    # Хранить данные (дней)
+    KEEP_HISTORY_DAYS: int = 365
 
-    USER_SCHEDULES = {
-        339487480: (17, 2),  # Замените на реальные ID и время
-      #  987654321: (17, 2),   17:00 до 02:00 (ночная смена)
-    }
-
+    # Выходные дни
     OFF_DAYS = (5, 6)  # Суббота и воскресенье
 
 

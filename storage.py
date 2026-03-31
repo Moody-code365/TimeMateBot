@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from models import ShiftRecord
 from config import config
 
@@ -13,6 +13,7 @@ class ShiftStorage:
         self.data_file = data_file
         self.active_shifts: Dict[int, ShiftRecord] = {}
         self.shift_history: List[ShiftRecord] = []
+        self.group_owners: Dict[int, Set[int]] = {}  # chat_id -> set of owner_ids
         self._load_data()
 
     def _ensure_data_dir(self):
@@ -178,3 +179,31 @@ class ShiftStorage:
     def get_all_active_shifts(self) -> List[ShiftRecord]:
         """Получить все активные смены"""
         return list(self.active_shifts.values())
+
+    async def update_group_owners(self, chat_id: int, owners: Set[int]):
+        """Обновить список владельцев группы"""
+        self.group_owners[chat_id] = owners
+
+    def is_group_owner(self, chat_id: int, user_id: int) -> bool:
+        """Проверить является ли пользователь владельцем группы"""
+        return user_id in self.group_owners.get(chat_id, set())
+
+    def get_all_users_stats(self) -> Dict[int, Dict]:
+        """Получить статистику по всем пользователям"""
+        stats = {}
+        for shift in self.shift_history:
+            user_id = shift.user_id
+            if user_id not in stats:
+                stats[user_id] = {
+                    'name': shift.full_name,
+                    'username': shift.username,
+                    'shifts_count': 0,
+                    'total_hours': 0
+                }
+            
+            stats[user_id]['shifts_count'] += 1
+            if shift.duration():
+                hours = shift.duration().total_seconds() / 3600
+                stats[user_id]['total_hours'] += hours
+        
+        return stats

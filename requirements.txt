@@ -1,3 +1,11 @@
+# Telegram Bot Framework
 aiogram==3.26.0
+
+# Environment variables
 python-dotenv==1.2.2
+
+# Task scheduling
 apscheduler==3.11.2
+
+# Additional dependencies for better performance
+aiofiles==24.1.0
